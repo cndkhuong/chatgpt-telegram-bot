@@ -15,15 +15,14 @@ from pydub import AudioSegment
 from openai_helper import OpenAIHelper
 from usage_tracker import UsageTracker
 
-
 def message_text(message: Message) -> str:
     """
     Returns the text of a message, excluding any bot commands.
     """
     message_text = message.text
+    logging.debug(message_text)
     if message_text is None:
         return ''
-
     for _, text in sorted(message.parse_entities([MessageEntity.BOT_COMMAND]).items(), key=(lambda item: item[0].offset)):
         message_text = message_text.replace(text, '').strip()
 
@@ -55,7 +54,7 @@ class ChatGPTTelegramBot:
             BotCommand(command='chat', description='Chat with the bot!')
         ] + self.commands
         self.disallowed_message = "Sorry, you are not allowed to use this bot. You can check out the source code at " \
-                                  "https://github.com/n3d1117/chatgpt-telegram-bot"
+                                  "https://github.com/cndkhuong/chatgpt-telegram-bot.git"
         self.budget_limit_message = "Sorry, you have reached your monthly usage limit."
         self.usage = {}
         self.last_message = {}
@@ -72,7 +71,7 @@ class ChatGPTTelegramBot:
                     '\n\n' + \
                     'Send me a voice message or file and I\'ll transcribe it for you!' + \
                     '\n\n' + \
-                    "Open source at https://github.com/n3d1117/chatgpt-telegram-bot"
+                    "Open source at https://github.com/cndkhuong/chatgpt-telegram-bot.git"
         await update.message.reply_text(help_text, disable_web_page_preview=True)
 
 
@@ -675,6 +674,18 @@ class ChatGPTTelegramBot:
         else:
             return 0.0
 
+    def is_mentionned_ingroup(self, update: Update, context: CallbackContext) -> bool:
+        logging.debug(update.message.text)
+        bot_name = '@' + str(os.getenv('TELEGRAM_BOT_NAME'))
+        logging.debug(bot_name)
+        if self.is_group_chat(update):
+            if update.message.text.startswith( bot_name ):
+                return True
+        else:
+            return True
+        
+        return False
+    
     async def is_within_budget(self, update: Update, context: CallbackContext) -> bool:
         """
         Checks if the user reached their monthly usage limit.
@@ -740,6 +751,9 @@ class ChatGPTTelegramBot:
             await self.send_budget_reached_message(update, context)
             return False
 
+        if not self.is_mentionned_ingroup(update, context):
+            return False
+        
         return True
 
     def get_reply_to_message_id(self, update: Update):
